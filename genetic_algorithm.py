@@ -33,7 +33,8 @@ class GA:
                  mutation_rate=0.1,
                  gamma_for_crossover=0.1,
                  gamma_for_mutation=0.1,
-                 plot_cost_function=False):
+                 plot_cost_function=False,
+                 y_axis="linear"):
 
 
         self._cost_function = cost_function
@@ -64,6 +65,7 @@ class GA:
         self._plot_cost_function = plot_cost_function
         self._worst_cost = None
         self._best_cost = []
+        self._yaxis = y_axis
 
     def _initialize_population(self):
 
@@ -82,11 +84,29 @@ class GA:
 
             return population
 
+        def initialize_population_real1D(population):
+
+            for i in range(len(population)):
+
+                population[i].position["real1D"] = {}
+
+                for j in range(len(self._type_number_of_variables["real1D"])):
+
+                    population[i].position["real1D"][j] = \
+                    np.random.uniform(self._min_range_of_real_variables,
+                                      self._max_range_of_real_variables,
+                                      (1, self._type_number_of_variables["real1D"][j]))
+            return population
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
 
                 population_main = initialize_population_binary1D(population_main)
+
+            if type_of_variable == "real1D":
+
+                population_main = initialize_population_real1D(population_main)
 
         return population_main
 
@@ -215,11 +235,60 @@ class GA:
 
             return population
 
+        def apply_crossover_real1D(population):
+
+            for i in range(0, len(population), 2):
+
+                population[i].position["real1D"] = {}
+                population[i + 1].position["real1D"] = {}
+
+                if self._parents_selection_method == "roulette_wheel_selection":
+
+                    first_parent_index = self._roulette_wheel_selection(self._population_main_probs)
+                    second_parent_index = self._roulette_wheel_selection(self._population_main_probs)
+                    while first_parent_index == second_parent_index:
+                        second_parent_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                else:
+
+                    first_parent_index = self._tournament_selection()
+                    second_parent_index = self._tournament_selection()
+                    while first_parent_index == second_parent_index:
+                        second_parent_index = self._tournament_selection()
+
+                for j in range(len(self._type_number_of_variables["real1D"])):
+
+                    parent_first = self._population_main[first_parent_index].position["real1D"][j]
+                    parent_second = self._population_main[second_parent_index].position["real1D"][j]
+
+                    alpha = np.random.uniform(-self._gamma_for_crossover, 1 + self._gamma_for_crossover,
+                                              parent_first.shape)
+
+                    population[i].position["real1D"][j] = \
+                    np.multiply(alpha, parent_first) + np.multiply(1 - alpha, parent_second)
+
+                    population[i + 1].position["real1D"][j] = \
+                    np.multiply(alpha, parent_second) + np.multiply(1 - alpha, parent_first)
+
+                    population[i].position["real1D"][j] = np.clip(population[i].position["real1D"][j],
+                                                                  self._min_range_of_real_variables,
+                                                                  self._max_range_of_real_variables)
+
+                    population[i + 1].position["real1D"][j] = np.clip(population[i + 1].position["real1D"][j],
+                                                                      self._min_range_of_real_variables,
+                                                                      self._max_range_of_real_variables)
+
+            return population
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
 
                 population_crossover = apply_crossover_binary1D(population_crossover)
+
+            if type_of_variable == "real1D":
+
+                population_crossover = apply_crossover_real1D(population_crossover)
 
         return population_crossover
 
@@ -259,11 +328,51 @@ class GA:
 
             return population
 
+        def apply_mutation_real1D(population):
+
+            for i in range(len(population)):
+
+                population[i].position["real1D"] = {}
+
+                if self._parents_selection_method == "roulette_wheel_selection":
+
+                    parent_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                else:
+
+                    parent_index = self._tournament_selection()
+
+                for j in range(len(self._type_number_of_variables["real1D"])):
+
+                    parent = self._population_main[parent_index].position["real1D"][j]
+
+                    number_of_mutation = int(np.ceil(self._mutation_rate * self._type_number_of_variables["real1D"][j]))
+
+                    mutated_cells = [int(i) for i in
+                                     np.random.choice(range(self._type_number_of_variables["real1D"][j]),
+                                                      number_of_mutation, replace=False)]
+
+                    population[i].position["real1D"][j] = copy.deepcopy(parent)
+
+                    population[i].position["real1D"][j][0, mutated_cells] += \
+                    self._gamma_for_mutation * (self._max_range_of_real_variables - self._min_range_of_real_variables) \
+                    * np.random.randn(number_of_mutation)
+
+
+                    population[i].position["real1D"][j] = np.clip(population[i].position["real1D"][j],
+                                                                  self._min_range_of_real_variables,
+                                                                  self._max_range_of_real_variables)
+            return population
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
 
                 population_mutation = apply_mutation_binary1D(population_mutation)
+
+            if type_of_variable == "real1D":
+
+                population_mutation = apply_mutation_real1D(population_mutation)
 
         return population_mutation
 
@@ -306,6 +415,7 @@ class GA:
         assert self._tournament_size >= 2, "tournament size should be greater or equal to 2."
         assert self._crossover_method in ["single_point", "double_point", "uniform"], \
         "crossover methods can be \"single point\", \"double point\" or \"uniform\". "
+        assert self._yaxis in ["linear", "log"], "y axis for plotting can be \"linear\" or \"log\"."
 
 
         self._population_main = self._initialize_population()
@@ -336,8 +446,6 @@ class GA:
 
             self._best_cost.append(self._population_main[0].cost)
 
-
-
         toc = time.time()
 
 
@@ -346,7 +454,10 @@ class GA:
             os.makedirs("./figures", exist_ok=True)
 
             plt.figure(dpi=300, figsize=(10, 6))
-            plt.plot(range(self._max_iteration), self._best_cost)
+            if self._yaxis == "linear":
+                plt.plot(range(self._max_iteration), self._best_cost)
+            if self._yaxis == "log":
+                plt.semilogy(range(self._max_iteration), self._best_cost)
             plt.xlabel("Number of Iteration")
             plt.ylabel("Best Cost")
             plt.title("Objective Function Value Per Iteration Using Genetic Algorithm", fontweight="bold")
