@@ -111,6 +111,20 @@ class GA:
 
             return population
 
+        def initialize_population_permutation1D(population):
+
+            for i in range(len(population)):
+
+                population[i].position["permutation1D"] = {}
+
+                for j in range(len(self._type_number_of_variables["permutation1D"])):
+
+                    population[i].position["permutation1D"][j] = \
+                    np.random.permutation(self._type_number_of_variables["permutation1D"][j]).\
+                        reshape(1, self._type_number_of_variables["permutation1D"][j])
+
+            return population
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
@@ -124,6 +138,10 @@ class GA:
             if type_of_variable == "real2D":
 
                 population_main = initialize_population_real2D(population_main)
+
+            if type_of_variable == "permutation1D":
+
+                population_main = initialize_population_permutation1D(population_main)
 
         return population_main
 
@@ -342,6 +360,57 @@ class GA:
 
             return population
 
+        def apply_crossover_permutation1D(population):
+
+            for i in range(0, len(population), 2):
+
+                population[i].position["permutation1D"] = {}
+                population[i + 1].position["permutation1D"] = {}
+
+                if self._parents_selection_method == "roulette_wheel_selection":
+
+                    parent_first_index = self._roulette_wheel_selection(self._population_main_probs)
+                    parent_second_index = self._roulette_wheel_selection(self._population_main_probs)
+                    while parent_first_index == parent_second_index:
+                        parent_second_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                else:
+
+                    parent_first_index = self._tournament_selection()
+                    parent_second_index = self._tournament_selection()
+                    while parent_first_index == parent_second_index:
+                        parent_second_index = self._tournament_selection()
+
+                for j in range(len(self._type_number_of_variables["permutation1D"])):
+
+                    parent_first = self._population_main[parent_first_index].position["permutation1D"][j]
+                    parent_second = self._population_main[parent_second_index].position["permutation1D"][j]
+
+                    p1 = copy.deepcopy(parent_first)
+                    p2 = copy.deepcopy(parent_second)
+
+                    cut_point = np.random.randint(1, p1.shape[1] - 1)
+
+                    parent_first_first_part = p1[:, :cut_point]
+                    parent_first_second_part = p1[:, cut_point:]
+
+                    parent_second_first_part = p2[:, :cut_point]
+                    parent_second_second_part = p2[:, cut_point:]
+
+                    a, b, c = np.intersect1d(parent_first_first_part, parent_second_second_part, return_indices=True)
+                    x, y, z = np.intersect1d(parent_second_first_part, parent_first_second_part, return_indices=True)
+
+                    if len(a) != 0 and len(x) != 0:
+                        parent_first_first_part[:, b] = x
+                        parent_second_first_part[:, y] = a
+
+                    population[i].position["permutation1D"][j] = np.concatenate((parent_first_first_part,
+                                                                                 parent_second_second_part), axis=1)
+
+                    population[i + 1].position["permutation1D"][j] = np.concatenate((parent_second_first_part,
+                                                                                     parent_first_second_part), axis=1)
+            return population
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
@@ -355,6 +424,10 @@ class GA:
             if type_of_variable == "real2D":
 
                 population_crossover = apply_crossover_real2D(population_crossover)
+
+            if type_of_variable == "permutation1D":
+
+                population_crossover = apply_crossover_permutation1D(population_crossover)
 
         return population_crossover
 
@@ -465,6 +538,143 @@ class GA:
 
             return population
 
+        def apply_mutation_permutation1D(population):
+
+
+            def swap(pop):
+
+                for i in range(len(pop)):
+
+                    pop[i].position["permutation1D"] = {}
+
+                    if self._parents_selection_method == "roulette_wheel_selection":
+
+                        parent_index = self._roulette_wheel_selection(self._population_main_probs)
+                    else:
+
+                        parent_index = self._tournament_selection()
+
+                    for j in range(len(self._type_number_of_variables["permutation1D"])):
+
+                        parent = self._population_main[parent_index].position["permutation1D"][j]
+
+                        indices = np.random.choice(range(int(parent.shape[1])), 2, replace=False)
+                        min_index, max_index = int(min(indices)), int(max(indices))
+
+                        pop[i].position["permutation1D"][j] = np.concatenate((parent[:, :min_index],
+                                                                              parent[:, max_index:max_index + 1],
+                                                                              parent[:, min_index + 1: max_index],
+                                                                              parent[:, min_index:min_index + 1],
+                                                                              parent[:, max_index + 1:]), axis=1)
+
+
+                return pop
+
+            def insertion(pop):
+
+                method_index = self._roulette_wheel_selection(np.random.dirichlet([0.5, 0.5]))
+
+                if method_index == 0:
+
+                    for i in range(len(pop)):
+
+                        pop[i].position["permutation1D"] = {}
+
+                        if self._parents_selection_method == "roulette_wheel_selection":
+
+                            parent_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                        else:
+
+                            parent_index = self._tournament_selection()
+
+                        for j in range(len(self._type_number_of_variables["permutation1D"])):
+
+                            parent = self._population_main[parent_index].position["permutation1D"][j]
+
+                            indices = np.random.choice(range(int(parent.shape[1])), 2, replace=False)
+                            min_index, max_index = int(min(indices)), int(max(indices))
+
+                            pop[i].position["permutation1D"][j] = np.concatenate((parent[:, :min_index + 1],
+                                                                                  parent[:, max_index: max_index + 1],
+                                                                                  parent[:, min_index + 1: max_index],
+                                                                                  parent[:, max_index + 1:]), axis=1)
+
+
+                else:
+
+                    for i in range(len(pop)):
+
+                        pop[i].position["permutation1D"] = {}
+
+                        if self._parents_selection_method == "roulette_wheel_selection":
+
+                            parent_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                        else:
+
+                            parent_index = self._tournament_selection()
+
+
+                        for j in range(len(self._type_number_of_variables["permutation1D"])):
+
+                            parent = self._population_main[parent_index].position["permutation1D"][j]
+
+                            indices = np.random.choice(range(int(parent.shape[1])), 2, replace=False)
+                            min_index, max_index = int(min(indices)), int(max(indices))
+
+                            pop[i].position["permutation1D"][j] = np.concatenate((parent[:, :min_index],
+                                                                                  parent[:, min_index + 1:
+                                                                                            max_index + 1],
+                                                                                  parent[:, min_index: min_index + 1],
+                                                                                  parent[:, max_index + 1:]), axis=1)
+
+                return pop
+
+            def reversion(pop):
+
+                for i in range(len(pop)):
+
+                    pop[i].position["permutation1D"] = {}
+
+                    if self._parents_selection_method == "roulette_wheel_selection":
+
+                        parent_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                    else:
+
+                        parent_index = self._tournament_selection()
+
+
+                    for j in range(len(self._type_number_of_variables["permutation1D"])):
+
+                        parent = self._population_main[parent_index].position["permutation1D"][j]
+
+                        indices = np.random.choice(range(int(parent.shape[1])), 2, replace=False)
+                        min_index, max_index = int(min(indices)), int(max(indices))
+
+                        pop[i].position["permutation1D"][j] = np.concatenate((parent[:, :min_index],
+                                                                              np.flip(parent[:,
+                                                                                      min_index:max_index + 1]),
+                                                                              parent[:, max_index + 1:]), axis=1)
+
+                return pop
+
+            method = self._roulette_wheel_selection(np.random.dirichlet([0.33, 0.33, 0.33]))
+
+            if method == 0:
+
+                population = swap(population)
+
+            elif method == 1:
+
+                population = insertion(population)
+
+            else:
+
+                population = reversion(population)
+
+            return population
 
         for type_of_variable in self._type_number_of_variables.keys():
 
@@ -479,6 +689,10 @@ class GA:
             if type_of_variable == "real2D":
 
                 population_mutation = apply_mutation_real2D(population_mutation)
+
+            if type_of_variable == "permutation1D":
+
+                population_mutation = apply_mutation_permutation1D(population_mutation)
 
         return population_mutation
 
