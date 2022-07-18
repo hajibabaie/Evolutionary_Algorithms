@@ -43,8 +43,6 @@ class GA:
         self._max_range_of_real_variables = max_range_of_real_variables
         self._min_range_of_integer_variables = min_range_of_integer_variables
         self._max_range_of_integer_variables = max_range_of_integer_variables
-        self._min_range_of_binary_variables = 0
-        self._max_range_of_binary_variables = 1
         self._max_iteration = max_iteration
         self._number_of_population = number_of_population
         self._parents_selection_method = parents_selection_method
@@ -98,6 +96,21 @@ class GA:
                                       (1, self._type_number_of_variables["real1D"][j]))
             return population
 
+        def initialize_population_real2D(population):
+
+            for i in range(len(population)):
+
+                population[i].position["real2D"] = {}
+
+                for j in range(len(self._type_number_of_variables["real2D"])):
+
+                    population[i].position["real2D"][j] = \
+                    np.random.uniform(self._min_range_of_real_variables,
+                                      self._max_range_of_real_variables,
+                                      self._type_number_of_variables["real2D"][j])
+
+            return population
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
@@ -107,6 +120,10 @@ class GA:
             if type_of_variable == "real1D":
 
                 population_main = initialize_population_real1D(population_main)
+
+            if type_of_variable == "real2D":
+
+                population_main = initialize_population_real2D(population_main)
 
         return population_main
 
@@ -280,6 +297,51 @@ class GA:
 
             return population
 
+        def apply_crossover_real2D(population):
+
+            for i in range(0, len(population), 2):
+
+                population[i].position["real2D"] = {}
+                population[i + 1].position["real2D"] = {}
+
+                if self._parents_selection_method == "roulette_wheel_selection":
+
+                    parent_first_index = self._roulette_wheel_selection(self._population_main_probs)
+                    parent_second_index = self._roulette_wheel_selection(self._population_main_probs)
+                    while parent_first_index == parent_second_index:
+                        parent_second_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                else:
+
+                    parent_first_index = self._tournament_selection()
+                    parent_second_index = self._tournament_selection()
+                    while parent_first_index == parent_second_index:
+                        parent_second_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                for j in range(len(self._type_number_of_variables["real2D"])):
+
+                    parent_first = self._population_main[parent_first_index].position["real2D"][j]
+                    parent_second = self._population_main[parent_second_index].position["real2D"][j]
+
+                    alpha = np.random.uniform(-self._gamma_for_crossover, 1 + self._gamma_for_crossover,
+                                              parent_first.shape)
+
+                    population[i].position["real2D"][j] = np.multiply(alpha, parent_first) + \
+                    np.multiply(1 - alpha, parent_second)
+
+                    population[i + 1].position["real2D"][j] = np.multiply(alpha, parent_second) + \
+                    np.multiply(1 - alpha, parent_first)
+
+                    population[i].position["real2D"][j] = np.clip(population[i].position["real2D"][j],
+                                                                  self._min_range_of_real_variables,
+                                                                  self._max_range_of_real_variables)
+
+                    population[i + 1].position["real2D"][j] = np.clip(population[i + 1].position["real2D"][j],
+                                                                      self._min_range_of_real_variables,
+                                                                      self._max_range_of_real_variables)
+
+            return population
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
@@ -289,6 +351,10 @@ class GA:
             if type_of_variable == "real1D":
 
                 population_crossover = apply_crossover_real1D(population_crossover)
+
+            if type_of_variable == "real2D":
+
+                population_crossover = apply_crossover_real2D(population_crossover)
 
         return population_crossover
 
@@ -364,6 +430,42 @@ class GA:
                                                                   self._max_range_of_real_variables)
             return population
 
+        def apply_mutation_real2D(population):
+
+            for i in range(len(population)):
+
+                population[i].position["real2D"] = {}
+
+                if self._parents_selection_method == "roulette_wheel_selection":
+
+                    parent_index = self._roulette_wheel_selection(self._population_main_probs)
+
+                else:
+
+                    parent_index = self._tournament_selection()
+
+                for j in range(len(self._type_number_of_variables["real2D"])):
+
+                    parent = self._population_main[parent_index].position["real2D"][j]
+
+                    number_of_mutation = int(np.ceil(self._mutation_rate * parent.size))
+
+                    row_indices = np.random.choice(range(parent.shape[0]), number_of_mutation)
+                    column_indices = np.random.choice(range(parent.shape[1]), number_of_mutation)
+
+                    population[i].position["real2D"][j] = copy.deepcopy(parent)
+
+                    population[i].position["real2D"][j][row_indices, column_indices] += \
+                    self._gamma_for_mutation * (self._max_range_of_real_variables -
+                                                self._min_range_of_real_variables) * np.random.randn(number_of_mutation)
+
+                    population[i].position["real2D"][j] = np.clip(population[i].position["real2D"][j],
+                                                                  self._min_range_of_real_variables,
+                                                                  self._max_range_of_real_variables)
+
+            return population
+
+
         for type_of_variable in self._type_number_of_variables.keys():
 
             if type_of_variable == "binary1D":
@@ -373,6 +475,10 @@ class GA:
             if type_of_variable == "real1D":
 
                 population_mutation = apply_mutation_real1D(population_mutation)
+
+            if type_of_variable == "real2D":
+
+                population_mutation = apply_mutation_real2D(population_mutation)
 
         return population_mutation
 
