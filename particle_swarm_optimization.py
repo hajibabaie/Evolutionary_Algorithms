@@ -38,10 +38,10 @@ class PSO:
                  personal_learning_rate=2,
                  global_learning_rate=2,
                  tempo_limit=False,
-                 mirroring_effect=False,
                  plot_cost_function=False,
                  y_axis="linear",
                  mutation_for_real=False,
+                 gamma_for_real_mutation=0.1,
                  mutation_for_permutation=False):
 
         self._cost_function = cost_function
@@ -57,10 +57,10 @@ class PSO:
         self._tempo_limit = tempo_limit
         self._tempo_max = 0.1 * (self._max_range_of_variables - self._min_range_of_variables)
         self._tempo_min = -self._tempo_max
-        self._mirroring_effect = mirroring_effect
         self._plot_cost_function = plot_cost_function
         self._y_axis = y_axis
         self._mutation_for_real = mutation_for_real
+        self._gamma_for_real_mutation = gamma_for_real_mutation
         self._mutation_for_permutation = mutation_for_permutation
         self._particles = None
         self._particle_best = self._ParticleBest()
@@ -68,7 +68,7 @@ class PSO:
 
     def _initialize_particles(self):
 
-        particles = [self._Particle() for i in range(self._number_of_particles)]
+        particles = [self._Particle() for _ in range(self._number_of_particles)]
 
         def initialize_particles_real1D(particle):
 
@@ -158,6 +158,78 @@ class PSO:
 
         return particles
 
+    def _mutation(self, particles):
+
+        if self._mutation_for_real:
+
+            for i in range(len(particles)):
+
+                mutated_particle = self._Particle()
+
+                for type_of_variable in self._type_number_of_variables.keys():
+
+                    if type_of_variable == "real1D":
+
+                        mutated_particle.position["real1D"] = {}
+
+                        for j in range(len(self._type_number_of_variables["real1D"])):
+
+                            alpha = np.random.uniform(-self._gamma_for_real_mutation,
+                                                      1 + self._gamma_for_real_mutation,
+                                                      (1, self._type_number_of_variables["real1D"][j]))
+
+                            mutated_particle.position["real1D"][j] = np.multiply(alpha,
+                                                                                 particles[i].position["real1D"][j])
+
+                            mutated_particle.position["real1D"][j] = np.clip(mutated_particle.position["real1D"][j],
+                                                                             self._min_range_of_variables,
+                                                                             self._max_range_of_variables)
+
+                            mutated_particle.solution_parsed, \
+                            mutated_particle.cost = self._cost_function(mutated_particle.position)
+
+                            if mutated_particle.cost < particles[i].cost:
+
+                                particles[i].position = copy.deepcopy(mutated_particle.position)
+                                particles[i].cost = copy.deepcopy(mutated_particle.cost)
+                                particles[i].solution_parsed = copy.deepcopy(mutated_particle.solution_parsed)
+
+            mutated_particle_best = self._ParticleBest()
+
+            for type_of_variable in self._type_number_of_variables.keys():
+
+                if type_of_variable == "real1D":
+
+                    mutated_particle_best.position["real1D"] = {}
+
+                    for j in range(len(self._type_number_of_variables["real1D"])):
+
+                        alpha = np.random.uniform(-self._gamma_for_real_mutation, 1 + self._gamma_for_real_mutation,
+                                                  (1, self._type_number_of_variables["real1D"][j]))
+
+                        mutated_particle_best.position["real1D"][j] = \
+                        np.multiply(alpha, self._particle_best.position["real1D"][j])
+
+                        mutated_particle_best.position["real1D"][j] = \
+                        np.clip(mutated_particle_best.position["real1D"][j], self._min_range_of_variables,
+                                self._max_range_of_variables)
+
+                        mutated_particle_best.solution_parsed, \
+                        mutated_particle_best.cost = self._cost_function(mutated_particle_best.position)
+
+                        if mutated_particle_best.cost < self._particle_best.cost:
+
+                            self._particle_best = copy.deepcopy(mutated_particle_best)
+
+
+
+        if self._mutation_for_permutation:
+
+            pass
+
+
+        return particles
+
     def run(self):
 
         tic = time.time()
@@ -175,6 +247,8 @@ class PSO:
             self._particles = self._update_velocity_and_positions()
 
             self._particles = self._evaluate_particles(self._particles)
+
+            self._particles = self._mutation(self._particles)
 
             self._best_cost.append(self._particle_best.cost)
 
@@ -195,7 +269,7 @@ class PSO:
             plt.title("Objective Function Value Per Iteration Using Particle Swarm Optimization", fontweight="bold")
             plt.savefig("./figures/cost_function_pso.png")
 
-        return self._particles, self._particle_best, toc - tic
+        return self._particle_best, toc - tic
 
 
 
