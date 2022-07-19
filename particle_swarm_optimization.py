@@ -176,11 +176,9 @@ class PSO:
 
             return particle
 
-        for type_of_variable in self._type_number_of_variables.keys():
+        if "real1D" in self._type_number_of_variables.keys() or "real2D" in self._type_number_of_variables.keys():
 
-            if type_of_variable == "real1D" or type_of_variable == "real2D":
-
-                particles = update_velocity_and_position_real1D_2D(particles)
+            particles = update_velocity_and_position_real1D_2D(particles)
 
         return particles
 
@@ -217,14 +215,14 @@ class PSO:
                         np.clip(mutated_particle.position[type_of_variable][j],
                                 self._min_range_of_variables, self._max_range_of_variables)
 
-                        mutated_particle.solution_parsed, \
-                        mutated_particle.cost = self._cost_function(mutated_particle.position)
+                mutated_particle.solution_parsed, \
+                mutated_particle.cost = self._cost_function(mutated_particle.position)
 
-                        if mutated_particle.cost < particles[i].cost:
+                if mutated_particle.cost < particles[i].cost:
 
-                            particles[i].position = copy.deepcopy(mutated_particle.position)
-                            particles[i].cost = copy.deepcopy(mutated_particle.cost)
-                            particles[i].solution_parsed = copy.deepcopy(mutated_particle.solution_parsed)
+                    particles[i].position = copy.deepcopy(mutated_particle.position)
+                    particles[i].cost = copy.deepcopy(mutated_particle.cost)
+                    particles[i].solution_parsed = copy.deepcopy(mutated_particle.solution_parsed)
 
             mutated_particle_best = self._ParticleBest()
 
@@ -252,12 +250,12 @@ class PSO:
                     np.clip(mutated_particle_best.position[type_of_variable][j], self._min_range_of_variables,
                             self._max_range_of_variables)
 
-                    mutated_particle_best.solution_parsed, \
-                    mutated_particle_best.cost = self._cost_function(mutated_particle_best.position)
+            mutated_particle_best.solution_parsed, \
+            mutated_particle_best.cost = self._cost_function(mutated_particle_best.position)
 
-                    if mutated_particle_best.cost < self._particle_best.cost:
+            if mutated_particle_best.cost < self._particle_best.cost:
 
-                        self._particle_best = copy.deepcopy(mutated_particle_best)
+                self._particle_best = copy.deepcopy(mutated_particle_best)
 
 
 
