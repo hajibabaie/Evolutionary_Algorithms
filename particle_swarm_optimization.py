@@ -239,7 +239,7 @@ class PSO:
 
                             if self._mutated_particle_best.cost < self._particle_best.cost:
 
-                                self._particle_best = copy.deepcopy(mutated_particle_best)
+                                self._particle_best = copy.deepcopy(self._mutated_particle_best)
 
 
                         if self._mutation_for_permutation:
